@@ -9,7 +9,13 @@ CarePilot AI is an end-to-end healthcare workflow automation platform that combi
 The goal was to go beyond a simple chatbot or isolated automation workflow and build a complete system with a user-facing interface, structured data management, automated workflows, monitoring, and human oversight for critical actions.
 
 ---
+## 🌐 Live Demo
 
+🚀 **Streamlit Dashboard:** [Open CarePilot AI](https://carepilot-ai-healthcare-automation-platform.streamlit.app/)
+
+> **Note:** The live deployment showcases the Streamlit dashboard. Full workflow execution requires the n8n backend to be running and connected to the configured webhooks. The complete n8n workflow is included in `workflow.json` for local setup.
+
+---
 ## 📸 Project Showcase
 
 ### Dashboard & Automation
