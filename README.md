@@ -144,7 +144,7 @@ CarePilot-AI-HealthCare-Automation-Platform/
 
 ### 1. Clone the Repository
 
-
+```
 git clone https://github.com/Waariha-Asim/CarePilot-AI-HealthCare-Automation-Platform.git
 cd CarePilot-AI-HealthCare-Automation-Platform
 
@@ -189,6 +189,7 @@ bash
 streamlit run app.py
 
 ---
+```
 
 ## 🌐 Deployment
 The Streamlit dashboard can be deployed independently using a platform such as Streamlit Community Cloud.
