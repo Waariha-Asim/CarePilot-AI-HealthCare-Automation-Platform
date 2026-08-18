@@ -1,0 +1,910 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "carepilot-ai",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7c37c1ae-3c30-4127-851c-a468d7fae908",
+      "name": "CarePilot Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-608, 272],
+      "webhookId": "carepilot-ai-webhook"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.feature_type }}",
+                    "rightValue": "intake",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "c5bf2554-50e8-4bf7-bbad-dadaf42ed40c"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Patient Intake"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.feature_type }}",
+                    "rightValue": "appointment",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "dd28ac44-e9ed-4cd6-a19d-ff863244c9dd"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Appointment"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.feature_type }}",
+                    "rightValue": "symptom",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "98ad9034-2aae-4935-b356-cf6c2d705a6a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Symptom Assessment"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.feature_type }}",
+                    "rightValue": "query",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "dd80f748-2cc8-4359-9f27-d88bc9064ede"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Patient Query"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b3e7f87d-6b5d-43ad-9eb3-9ac99547cb0b",
+      "name": "Feature Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [-336, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer YOUR_GROQ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"openai/gpt-oss-120b\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a healthcare records assistant. Extract patient information from the provided data. Return ONLY valid JSON with patient_id (format: CP-YYYY-XXXX), name, age, gender, contact, key_health_notes (array), record_status. Do not diagnose or add medical information that is not provided.\"},{\"role\":\"user\",\"content\":\"Patient Data: Name: {{$json.body.data.full_name}}, Age: {{$json.body.data.age}}, Gender: {{$json.body.data.gender}}, Contact: {{$json.body.data.contact}}, Email: {{$json.body.data.email}}, Medical History: {{$json.body.data.medical_history}}\"}],\"temperature\":0.1,\"response_format\":{\"type\":\"json_object\"}}",
+        "options": {}
+      },
+      "id": "0a3fc489-4208-4af6-85b8-7e59efb9052f",
+      "name": "F1 — AI Patient Extraction",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [112, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.choices?.[0]?.message?.content || '{}';\nlet data;\ntry {\n  data = JSON.parse(raw);\n} catch(e) {\n  data = {\n    patient_id: 'CP-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000),\n    name: $('CarePilot Webhook').item.json.body.data.full_name || 'Unknown',\n    age: $('CarePilot Webhook').item.json.body.data.age || 0,\n    gender: $('CarePilot Webhook').item.json.body.data.gender || 'Not provided',\n    contact: $('CarePilot Webhook').item.json.body.data.contact || 'Not provided',\n    key_health_notes: [],\n    record_status: 'created'\n  };\n}\n\ndata.patient_id = $('CarePilot Webhook').item.json.body.data.suggested_patient_id || \n  data.patient_id || \n  'CP-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9000) + 1000);\ndata.name = data.name || $('CarePilot Webhook').item.json.body.data.full_name || 'Unknown';\ndata.record_status = data.record_status || 'created';\ndata.key_health_notes = data.key_health_notes || [];\n\nreturn [{ json: { ...data, timestamp: new Date().toISOString() } }];"
+      },
+      "id": "82013cad-ff20-4b15-9a3f-d4c79f91d83e",
+      "name": "F1 — Format Patient Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [368, -80]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Patients",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Patient ID": "={{$json.patient_id}}",
+            "Name": "={{$json.name}}",
+            "Age": "={{$json.age}}",
+            "Gender": "={{$json.gender}}",
+            "Contact": "={{$json.contact}}",
+            "Health Notes": "={{($json.key_health_notes || []).join(', ')}}",
+            "Status": "={{$json.record_status}}",
+            "Timestamp": "={{$json.timestamp}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "c91c357b-4045-4e46-ad5e-26c00d147447",
+      "name": "F1 — Save Patient",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [608, -80]
+    },
+    {
+      "parameters": {
+        "sendTo": "=YOUR_EMAIL",
+        "subject": "CarePilot AI — Patient Record Created",
+        "emailType": "text",
+        "message": "=Hi {{ $json.Name }},\n\nYour patient record has been successfully created.\n\nPatient ID: {{ $json['Patient ID'] }}\nStatus: {{ $json.Status }}\n\nThank you for choosing CarePilot AI.\n\n---\nThis is an automated notification. Please do not reply to this email.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "f6d13a5a-ecc5-4fec-862f-b4642f15e688",
+      "name": "F1 — Confirmation Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [832, -80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer YOUR_GROQ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"openai/gpt-oss-120b\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a healthcare appointment routing assistant. Return ONLY valid JSON with department, priority (urgent/high/medium/low), urgency_level, recommended_action and ai_notes. Do not diagnose.\"},{\"role\":\"user\",\"content\":\"Patient: {{$json.body.data.patient_name}}, ID: {{$json.body.data.patient_id}}, Preferred Date: {{$json.body.data.preferred_date}}, Symptoms/Reason: {{$json.body.data.reason}}\"}],\"temperature\":0.1,\"response_format\":{\"type\":\"json_object\"}}",
+        "options": {}
+      },
+      "id": "5350a9cb-af62-49fc-a9e7-8da1255b767f",
+      "name": "F2 — AI Appointment Classification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [112, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.choices?.[0]?.message?.content || '{}';\n\nlet ai = {};\n\ntry {\n  ai = typeof raw === 'string' ? JSON.parse(raw) : raw;\n} catch (error) {\n  ai = {};\n}\n\nconst webhook = $('CarePilot Webhook').item.json.body.data;\n\nreturn [\n  {\n    json: {\n      appointment_id: $('CarePilot Webhook').item.json.body.data.suggested_appt_id || `APT-2026-${Date.now()}`,\n\n      patient_id: webhook.patient_id || '',\n      patient_name: webhook.patient_name || '',\n\n      department: ai.department || 'General Medicine',\n      priority: ai.priority || 'medium',\n      urgency_level: ai.urgency_level || 'normal',\n      recommended_action:\n        ai.recommended_action || 'Contact clinic for scheduling',\n      ai_notes:\n        ai.ai_notes || 'AI assessment completed',\n\n      date: webhook.preferred_date || '',\n      time: webhook.preferred_time || '',\n\n      status: 'Pending',\n      reminder_sent: 'false',\n      alert_sent: 'false',\n\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "be12837d-1d4c-4b84-9be6-af7b3938aff8",
+      "name": "F2 — Format Appointment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [352, 160]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.priority}}",
+              "rightValue": "urgent",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "1e9a37bb-c686-4115-88ef-121631f8a915"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0c90c620-9501-4e27-85aa-bba173f9e477",
+      "name": "F2 — Urgent Priority Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [592, 160]
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_EMAIL",
+        "subject": "URGENT — CarePilot Appointment Alert",
+        "emailType": "text",
+        "message": "=URGENT appointment request received.\n\nPatient: {{$('CarePilot Webhook').item.json.body.data.patient_name}}\nDepartment: {{$json.department}}\nPriority: {{$json.priority}}\nUrgency: {{$json.urgency_level}}\nNotes: {{$json.ai_notes}}\n\nPlease review immediately.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "40102157-b0e8-4d0d-b155-3bd3f1781b6c",
+      "name": "F2 — Staff Urgent Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [832, 80]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Appt ID": "={{ $('F2 — Format Appointment').item.json.appointment_id }}",
+            "Patient ID": "={{ $('F2 — Format Appointment').item.json.patient_id }}",
+            "Department": "={{ $('F2 — Format Appointment').item.json.department }}",
+            "Priority": "={{ $('F2 — Format Appointment').item.json.priority }}",
+            "Date": "={{ $('F2 — Format Appointment').item.json.date }}",
+            "Status": "Pending",
+            "Reminder Sent": "false",
+            "Alert Sent": "={{ $('F2 — Format Appointment').item.json.alert_sent }}",
+            "Time": "={{ $('F2 — Format Appointment').item.json.time }}",
+            "Patient": "={{ $('F2 — Format Appointment').item.json.patient_name }}",
+            "Notes": "={{ $('F2 — Format Appointment').item.json.ai_notes }}",
+            "Last Updated": "={{ $('F2 — Format Appointment').item.json.timestamp }}"
+          },
+          "matchingColumns": ["id"]
+        },
+        "options": {}
+      },
+      "id": "1f7486d1-e097-4fe9-b018-53a0c1ef1db4",
+      "name": "F2 — Log Appointment",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [912, 288]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer YOUR_GROQ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"openai/gpt-oss-120b\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a healthcare information routing assistant, NOT a doctor. Return ONLY valid JSON with symptom_summary, recommended_department, urgency_level (urgent/high/medium/low), suggested_questions (array of 3-5 questions), disclaimer. Never diagnose.\"},{\"role\":\"user\",\"content\":\"Patient symptom description: {{$json.body.data.symptoms}}\"}],\"temperature\":0.1,\"response_format\":{\"type\":\"json_object\"}}",
+        "options": {}
+      },
+      "id": "e0a091d7-e66d-4138-ad20-869fa27499bc",
+      "name": "F3 — AI Symptom Assessment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [112, 464]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw=$json.choices?.[0]?.message?.content||'{}';\nlet d;\ntry{d=JSON.parse(raw)}catch(e){d={symptom_summary:'Unable to process symptoms',recommended_department:'General Medicine',urgency_level:'medium',suggested_questions:['When did symptoms start?','How often do they occur?','Any other symptoms?'],disclaimer:'This is an informational assessment, not a medical diagnosis.'}}\nreturn [{json:{...d,query_id:'QRY-'+Date.now(),timestamp:new Date().toISOString()}}];"
+      },
+      "id": "fc37682f-d60a-41fe-9457-bc4a4abf038b",
+      "name": "F3 — Format Assessment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [352, 464]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Queries",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Query ID": "={{$json.query_id}}",
+            "Patient ID": "={{$('CarePilot Webhook').item.json.body.data.patient_id || 'Anonymous'}}",
+            "Type": "Symptom Assessment",
+            "Input": "={{$('CarePilot Webhook').item.json.body.data.symptoms}}",
+            "Intent": "Symptom Assessment",
+            "Department": "={{$json.recommended_department}}",
+            "Urgency": "={{$json.urgency_level}}",
+            "AI Response": "={{$json.symptom_summary}}",
+            "Timestamp": "={{$json.timestamp}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "7b4e586e-f21b-4405-a698-2ae573d6cacb",
+      "name": "F3 — Log Assessment",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [592, 464]
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_EMAIL",
+        "subject": "CarePilot AI — Symptom Assessment",
+        "emailType": "text",
+        "message": "=Symptom Summary: {{ $('F3 — Format Assessment').item.json.symptom_summary }}\n\nRecommended Department: {{ $json.Department }}\nUrgency Level: {{ $('F3 — Format Assessment').item.json.urgency_level }}\n\nQuestions to discuss with your doctor:\n{{($('F3 — Format Assessment').item.json.suggested_questions || []).map(q => '- ' + q).join('\\n')}}\n\n\n{{ $('F3 — Format Assessment').item.json.disclaimer }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "a864a9a6-7f13-40c4-88f9-c968d828648b",
+      "name": "F3 — Send Assessment",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [832, 464]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer YOUR_GROQ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a clinic communication router. Return ONLY valid JSON with exactly these fields: intent, confidence, extracted_details, workflow_triggered, and action. Valid intents are: appointment_book, appointment_reschedule, appointment_cancel, general_query, urgent_complaint, other. Determine the patient's intent accurately from their message. Set workflow_triggered based on the detected intent: appointment_book = \\\"Appointment Booking\\\", appointment_reschedule = \\\"Appointment Rescheduling\\\", appointment_cancel = \\\"Appointment Cancellation\\\", urgent_complaint = \\\"Urgent Staff Review\\\", general_query = \\\"General Query\\\", other = \\\"No Workflow\\\". The workflow_triggered field must NEVER be false, null, or empty. Always return one of the specified workflow names. confidence must be a number between 0 and 1. extracted_details must contain any relevant information extracted from the patient's message. action must briefly describe the appropriate action based on the detected intent. Do not diagnose medical conditions. Return ONLY the JSON object.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Patient message: {{$json.body.data.query}}\"\n    }\n  ],\n  \"temperature\": 0.1,\n  \"response_format\": {\n    \"type\": \"json_object\"\n  }\n}",
+        "options": {}
+      },
+      "id": "471feb9b-f67e-47e2-b0ce-678588ecfb8a",
+      "name": "F4 — AI Intent Detection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [112, 640]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw=$json.choices?.[0]?.message?.content||'{}';\nlet d;\ntry{d=JSON.parse(raw)}catch(e){d={intent:'other',confidence:0.5,extracted_details:{},workflow_triggered:'Fallback - Manual Review',action:'Manual review required'}}\nreturn [{json:{...d,query_id:'QRY-'+Date.now(),timestamp:new Date().toISOString()}}];"
+      },
+      "id": "1fa9d9a2-884c-4b85-9e9e-a80b78b5ee0d",
+      "name": "F4 — Format Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [352, 640]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Queries",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Query ID": "={{$json.query_id}}",
+            "Patient ID": "={{$('CarePilot Webhook').item.json.body.data.patient_id || 'Anonymous'}}",
+            "Type": "Patient Query",
+            "Input": "={{$('CarePilot Webhook').item.json.body.data.query}}",
+            "Intent": "={{$json.intent}}",
+            "Department": "={{$json.workflow_triggered}}",
+            "Urgency": "={{$json.intent === 'urgent_complaint' ? 'urgent' : 'normal'}}",
+            "AI Response": "={{$json.action}}",
+            "Timestamp": "={{$json.timestamp}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "32b4b9c1-4bc4-4cec-9b97-6ec7bfd953b2",
+      "name": "F4 — Log Query",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [592, 640]
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_EMAIL",
+        "subject": "CarePilot AI — Request Received",
+        "emailType": "text",
+        "message": "=Your request has been received.\n\nIntent Detected: {{ $('F4 — Format Query').item.json.intent }}\nAction Taken: {{ $('F4 — Format Query').item.json.action }}\nWorkflow: {{ $('F4 — Format Query').item.json.workflow_triggered }}\nConfidence:{{ $('F4 — Format Query').item.json.confidence }}\n\nThank you,\nCarePilot AI Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "9691551b-9512-4149-99ad-4d0eeba61107",
+      "name": "F4 — Send Response",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [848, 640]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, patient_id: $('F1 — Format Patient Record').item.json.patient_id, name: $('F1 — Format Patient Record').item.json.name, record_status: $('F1 — Format Patient Record').item.json.record_status }) }}",
+        "options": {}
+      },
+      "id": "5529b71f-a2a3-45f0-8d7b-5261a91e108e",
+      "name": "Return JSON to Streamlit",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1088, -80]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, appointment_id: $('F2 — Format Appointment').item.json.appointment_id, department: $('F2 — Format Appointment').item.json.department, priority: $('F2 — Format Appointment').item.json.priority, urgency_level: $('F2 — Format Appointment').item.json.urgency_level, recommended_action: $('F2 — Format Appointment').item.json.recommended_action }) }}",
+        "options": {}
+      },
+      "id": "f34e4990-7da9-4f68-a849-0a6c9eefa0fc",
+      "name": "Return JSON to Streamlit1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1104, 288]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, query_id: $('F3 — Format Assessment').item.json.query_id, symptom_summary: $('F3 — Format Assessment').item.json.symptom_summary, recommended_department: $('F3 — Format Assessment').item.json.recommended_department, urgency_level: $('F3 — Format Assessment').item.json.urgency_level, suggested_questions: $('F3 — Format Assessment').item.json.suggested_questions }) }}",
+        "options": {}
+      },
+      "id": "8730ec5b-54e9-4653-8d54-d3db1fc03dc6",
+      "name": "Return JSON to Streamlit2",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1104, 464]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message_id\": $('F4 — Format Query').item.json.query_id, \"intent\": $('F4 — Format Query').item.json.intent, \"confidence\": $('F4 — Format Query').item.json.confidence, \"workflow_triggered\": $('F4 — Format Query').item.json.workflow_triggered, \"action\": $('F4 — Format Query').item.json.action } }}",
+        "options": {}
+      },
+      "id": "ec00fcc8-6ccf-48ad-8fbf-46eaf8bfd6b5",
+      "name": "Return JSON to Streamlit3",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 640]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "id": "574c74c1-3fb8-489e-b14c-10c9ef8d375e",
+      "name": "Human Approval — High/Urgent Review",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1344, 832],
+      "webhookId": "6796e0e6-a7ff-4e81-b35c-b096075b2c6d"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "17f20502-c47b-4aed-8408-907ea1a90629",
+      "name": "Daily 9 AM Follow-up Check1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-912, 752]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "carepilot-followups",
+        "options": {}
+      },
+      "id": "625e30df-444b-4293-a5bd-3ea31bcd7693",
+      "name": "Streamlit Manual Follow-up Trigger1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-912, 976],
+      "webhookId": "carepilot-followups"
+    },
+    {
+      "parameters": {},
+      "id": "9f12acf4-45eb-4a88-8e7a-855029ca6bbf",
+      "name": "Merge Triggers1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-624, 832]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "FollowUps",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "2de40735-0d88-4722-94e5-35d4df87a65a",
+      "name": "Read Follow-up Records1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [-384, 832]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst cutoff = new Date(now.getTime() + 48 * 60 * 60 * 1000);\n\nreturn $input.all().filter(item => {\n  const r = item.json;\n  if (!r.Date) return false;\n\n  const status = String(r.Status || '').toLowerCase();\n  const reminderSent = String(r['Reminder Sent'] || '').toLowerCase();\n\n  if (status !== 'pending' && status !== 'confirmed') return false;\n  if (reminderSent === 'true') return false;\n\n  const appointmentDate = new Date(r.Date);\n  return appointmentDate >= now && appointmentDate <= cutoff;\n});"
+      },
+      "id": "e3a36444-0bb3-436f-b799-a76d75eae4d5",
+      "name": "Filter Upcoming Appointments1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-144, 832]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "275947c9-dbc6-4fe7-b655-457f1d67645d",
+      "name": "Process Appointments One by One1",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [96, 832]
+    },
+    {
+      "parameters": {
+        "sendTo": "=YOUR_EMAIL",
+        "subject": "CarePilot AI — Appointment Reminder",
+        "emailType": "text",
+        "message": "=Hi {{ $json.Patient }},\n\nThis is a reminder for your upcoming appointment.\n\nAppointment ID: {{ $json['Appt ID'] }}\nDate: {{ $json.Date }}\nTime: {{ $json.Time }}\n\nPlease arrive a few minutes early. If you need to reschedule, please contact the clinic.\n\nBest regards,\nCarePilot AI",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "eb273f23-2b5f-404b-abde-72f56df85d59",
+      "name": "Send Patient Reminder1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [352, 848]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "FollowUps",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Appt ID": "={{ $('Process Appointments One by One1').item.json['Appt ID'] }}",
+            "Reminder Sent": "true",
+            "Last Updated": "={{ new Date().toISOString() }}",
+            "Patient ID": "={{ $('Process Appointments One by One1').item.json['Patient ID'] }}",
+            "Alert Sent": "={{ $('Process Appointments One by One1').item.json['Alert Sent'] || 'false' }}",
+            "Status": "={{ $('Process Appointments One by One1').item.json['Status'] }}",
+            "Time": "={{ $('Process Appointments One by One1').item.json['Time'] }}",
+            "Date": "={{ $('Process Appointments One by One1').item.json['Date'] }}",
+            "Patient": "={{ $('Process Appointments One by One1').item.json.Patient }}"
+          },
+          "matchingColumns": ["Appt ID"]
+        },
+        "options": {}
+      },
+      "id": "51e3e80c-c230-4108-b23e-8fb4c69d1c3d",
+      "name": "Mark Reminder Sent1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [592, 848]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ String($('Process Appointments One by One1').item.json.Priority || '').trim().toLowerCase() }}",
+              "rightValue": "high",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "e0d41ebf-258f-4a32-9f56-d5f0e3733fa8"
+            },
+            {
+              "leftValue": "={{ String($('Process Appointments One by One1').item.json.Priority || '').trim().toLowerCase() }}",
+              "rightValue": "urgent",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "e9d6bf33-3e78-41eb-88b1-7c3c1e2042cd"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "2dd8c67e-049a-4311-acb1-35538f71d7f6",
+      "name": "Check High or Urgent Priority1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [848, 848]
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_EMAIL",
+        "subject": "=CarePilot AI — {{ $('Process Appointments One by One1').item.json.Priority }} Priority Alert",
+        "message": "=<!DOCTYPE html>\n<html>\n<body style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #1E293B;\">\n\n<h2 style=\"color:#7C3AED;\">CarePilot AI — Priority Alert</h2>\n\n<p>A high-priority appointment requires staff attention.</p>\n\n<table style=\"border-collapse:collapse; width:100%; max-width:500px;\">\n  <tr>\n    <td><strong>Patient</strong></td>\n    <td>{{ $('Process Appointments One by One1').item.json.Patient }}</td>\n  </tr>\n  <tr>\n    <td><strong>Appointment ID</strong></td>\n    <td>{{ $('Process Appointments One by One1').item.json['Appt ID'] }}</td>\n  </tr>\n  <tr>\n    <td><strong>Date</strong></td>\n    <td>{{ $('Process Appointments One by One1').item.json.Date }}</td>\n  </tr>\n  <tr>\n    <td><strong>Time</strong></td>\n    <td>{{ $('Process Appointments One by One1').item.json.Time }}</td>\n  </tr>\n  <tr>\n    <td><strong>Priority</strong></td>\n    <td>{{ $('Process Appointments One by One1').item.json.Priority }}</td>\n  </tr>\n</table>\n\n<p style=\"margin-top:25px;\">\n  Please review this appointment and confirm that it has been handled.\n</p>\n\n<p style=\"margin:25px 0;\">\n  <a href=\"{{ $execution.resumeUrl }}\"\n     style=\"background:#7C3AED;\n            color:#ffffff;\n            padding:12px 24px;\n            text-decoration:none;\n            border-radius:7px;\n            font-weight:bold;\n            display:inline-block;\">\n    ✓ Approve / Mark as Reviewed\n  </a>\n</p>\n\n<p style=\"color:#64748B; font-size:12px;\">\n  This action will resume the CarePilot AI workflow and mark the staff alert as reviewed.\n</p>\n\n<p style=\"color:#64748B;\">\n  CarePilot AI\n</p>\n\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "6f378eb4-f672-4694-be89-17f634fd9bac",
+      "name": "Send Staff Priority Alert1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1120, 832]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "FollowUps",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Appt ID": "={{ $('Process Appointments One by One1').item.json['Appt ID'] }}",
+            "Reminder Sent": "=true",
+            "Patient ID": "={{ $('Process Appointments One by One1').item.json['Patient ID'] }}",
+            "Alert Sent": "=true",
+            "Status": "={{ $('Process Appointments One by One1').item.json['Status'] }}",
+            "Time": "={{ $('Process Appointments One by One1').item.json['Time'] }}",
+            "Date": "={{ $('Process Appointments One by One1').item.json['Date'] }}",
+            "Patient": "={{ $('Process Appointments One by One1').item.json.Patient }}"
+          },
+          "matchingColumns": ["Appt ID"]
+        },
+        "options": {}
+      },
+      "id": "044d6d77-e222-4d1a-b217-714e58fa8e77",
+      "name": "Mark Staff Alert Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1568, 832]
+    }
+  ],
+  "connections": {
+    "CarePilot Webhook": {
+      "main": [[{"node": "Feature Router", "type": "main", "index": 0}]]
+    },
+    "Feature Router": {
+      "main": [
+        [{"node": "F1 — AI Patient Extraction", "type": "main", "index": 0}],
+        [{"node": "F2 — AI Appointment Classification", "type": "main", "index": 0}],
+        [{"node": "F3 — AI Symptom Assessment", "type": "main", "index": 0}],
+        [{"node": "F4 — AI Intent Detection", "type": "main", "index": 0}]
+      ]
+    },
+    "F1 — AI Patient Extraction": {
+      "main": [[{"node": "F1 — Format Patient Record", "type": "main", "index": 0}]]
+    },
+    "F1 — Format Patient Record": {
+      "main": [[{"node": "F1 — Save Patient", "type": "main", "index": 0}]]
+    },
+    "F1 — Save Patient": {
+      "main": [[{"node": "F1 — Confirmation Email", "type": "main", "index": 0}]]
+    },
+    "F1 — Confirmation Email": {
+      "main": [[{"node": "Return JSON to Streamlit", "type": "main", "index": 0}]]
+    },
+    "F2 — AI Appointment Classification": {
+      "main": [[{"node": "F2 — Format Appointment", "type": "main", "index": 0}]]
+    },
+    "F2 — Format Appointment": {
+      "main": [[{"node": "F2 — Urgent Priority Check", "type": "main", "index": 0}]]
+    },
+    "F2 — Urgent Priority Check": {
+      "main": [
+        [{"node": "F2 — Staff Urgent Alert", "type": "main", "index": 0}],
+        [{"node": "F2 — Log Appointment", "type": "main", "index": 0}]
+      ]
+    },
+    "F2 — Staff Urgent Alert": {
+      "main": [[{"node": "F2 — Log Appointment", "type": "main", "index": 0}]]
+    },
+    "F2 — Log Appointment": {
+      "main": [[{"node": "Return JSON to Streamlit1", "type": "main", "index": 0}]]
+    },
+    "F3 — AI Symptom Assessment": {
+      "main": [[{"node": "F3 — Format Assessment", "type": "main", "index": 0}]]
+    },
+    "F3 — Format Assessment": {
+      "main": [[{"node": "F3 — Log Assessment", "type": "main", "index": 0}]]
+    },
+    "F3 — Log Assessment": {
+      "main": [[{"node": "F3 — Send Assessment", "type": "main", "index": 0}]]
+    },
+    "F3 — Send Assessment": {
+      "main": [[{"node": "Return JSON to Streamlit2", "type": "main", "index": 0}]]
+    },
+    "F4 — AI Intent Detection": {
+      "main": [[{"node": "F4 — Format Query", "type": "main", "index": 0}]]
+    },
+    "F4 — Format Query": {
+      "main": [[{"node": "F4 — Log Query", "type": "main", "index": 0}]]
+    },
+    "F4 — Log Query": {
+      "main": [[{"node": "F4 — Send Response", "type": "main", "index": 0}]]
+    },
+    "F4 — Send Response": {
+      "main": [[{"node": "Return JSON to Streamlit3", "type": "main", "index": 0}]]
+    },
+    "Human Approval — High/Urgent Review": {
+      "main": [[{"node": "Mark Staff Alert Sent", "type": "main", "index": 0}]]
+    },
+    "Daily 9 AM Follow-up Check1": {
+      "main": [[{"node": "Merge Triggers1", "type": "main", "index": 0}]]
+    },
+    "Streamlit Manual Follow-up Trigger1": {
+      "main": [[{"node": "Merge Triggers1", "type": "main", "index": 1}]]
+    },
+    "Merge Triggers1": {
+      "main": [[{"node": "Read Follow-up Records1", "type": "main", "index": 0}]]
+    },
+    "Read Follow-up Records1": {
+      "main": [[{"node": "Filter Upcoming Appointments1", "type": "main", "index": 0}]]
+    },
+    "Filter Upcoming Appointments1": {
+      "main": [[{"node": "Process Appointments One by One1", "type": "main", "index": 0}]]
+    },
+    "Process Appointments One by One1": {
+      "main": [
+        [],
+        [{"node": "Send Patient Reminder1", "type": "main", "index": 0}]
+      ]
+    },
+    "Send Patient Reminder1": {
+      "main": [[{"node": "Mark Reminder Sent1", "type": "main", "index": 0}]]
+    },
+    "Mark Reminder Sent1": {
+      "main": [[{"node": "Check High or Urgent Priority1", "type": "main", "index": 0}]]
+    },
+    "Check High or Urgent Priority1": {
+      "main": [
+        [{"node": "Send Staff Priority Alert1", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "Send Staff Priority Alert1": {
+      "main": [[{"node": "Human Approval — High/Urgent Review", "type": "main", "index": 0}]]
+    },
+    "Mark Staff Alert Sent": {
+      "main": [[{"node": "Process Appointments One by One1", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  }
+}
