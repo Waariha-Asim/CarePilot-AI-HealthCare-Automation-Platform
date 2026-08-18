@@ -162,7 +162,7 @@ def get_recent_appointments(limit=6):
     for _, r in df.iterrows():
         records.append({
             "id": r.get("Appt ID", "—"),
-            "patient": r.get("Patient Name", "Unknown"),
+            "patient": r.get("Patient", "Unknown"),
             "department": r.get("Department", "—"),
             "priority": str(r.get("Priority", "medium")),
             "date": r.get("Date", "—"),
